@@ -4,13 +4,19 @@
 
 ## 下载与发布
 
-你可以在 [GitHub Releases](https://github.com/CreatorOfBucket/YouShouldDO/releases) 页面找到最新的版本并下载源码或查看发行说明。
+你可以在 [GitHub Releases](https://github.com/CreatorOfBucket/YouShouldDO/releases) 页面找到最新的版本并下载 **Windows 安装包**（推荐）或查看发行说明。
 
-- **最新正式版本**: [v1.0.0](https://github.com/CreatorOfBucket/YouShouldDO/releases/tag/v1.0.0)
+- **最新正式版本（Windows 安装包）**: [v1.0.2](https://github.com/CreatorOfBucket/YouShouldDO/releases/tag/v1.0.2)
+
+### Windows 用户（推荐）
+
+1. 打开 Releases 页面，进入最新版本（如 v1.0.2）。
+2. 下载并运行安装包：`YouShouldDO Setup 1.0.2.exe`。
+3. 按向导安装后即可使用。
 
 ## 部署说明
 
-只要安装了 Node.js，任何人都可以通过以下简单的步骤在自己的电脑上运行此程序。
+以下内容面向开发者（从源码运行）。普通用户请优先使用上面的 Windows 安装包。
 
 ### 1. 环境准备
 确保你的电脑上已经安装了 [Node.js](https://nodejs.org/) (建议使用 LTS 版本)。安装 Node.js 后，`npm` 也会自动安装。
