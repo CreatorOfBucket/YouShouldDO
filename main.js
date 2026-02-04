@@ -3,6 +3,7 @@ const path = require('path');
 
 let mainWindow;
 let guardianInterval = null;
+let isPinnedMode = false;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -24,7 +25,7 @@ function createWindow() {
 
     mainWindow.on('closed', () => {
         mainWindow = null;
-        if (guardianInterval) clearInterval(guardianInterval);
+        stopVisibilityGuardian();
     });
 }
 
@@ -32,20 +33,16 @@ function startVisibilityGuardian() {
     if (guardianInterval) clearInterval(guardianInterval);
 
     guardianInterval = setInterval(() => {
-        if (!mainWindow) {
-            clearInterval(guardianInterval);
+        if (!mainWindow || !isPinnedMode) {
             return;
         }
 
-        // 核心技术：强力对抗 Win+D
-        // 1. 如果窗口被隐藏或最小化，立刻恢复
-        // 2. 维持最高级别的置顶
-        if (!mainWindow.isVisible() || mainWindow.isMinimized()) {
-            mainWindow.restore(); // 恢复最小化
-            mainWindow.show();    // 确保显示
-            mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        // 只在窗口被"隐藏"时恢复（如 Win+D）
+        // 不设置 alwaysOnTop，这样其他应用可以正常覆盖它
+        if (!mainWindow.isVisible()) {
+            mainWindow.showInactive(); // 显示但不抢占焦点
         }
-    }, 100);
+    }, 150);
 }
 
 function stopVisibilityGuardian() {
@@ -58,15 +55,18 @@ function stopVisibilityGuardian() {
 ipcMain.on('toggle-pin-desktop', (event, shouldPin) => {
     if (!mainWindow) return;
 
+    isPinnedMode = shouldPin;
+
     if (shouldPin) {
-        // 开启固定模式：禁止最小化，隐藏任务栏图标，最高级置顶
-        mainWindow.setMinimizable(false);
+        // 固定模式：
+        // 1. 隐藏任务栏图标
+        // 2. 不设置 alwaysOnTop（允许其他窗口覆盖）
+        // 3. 启动守护进程，只对抗 Win+D
         mainWindow.setSkipTaskbar(true);
-        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        mainWindow.setAlwaysOnTop(false);
         startVisibilityGuardian();
     } else {
-        // 关闭固定模式：恢复普通窗口行为
-        mainWindow.setMinimizable(true);
+        // 取消固定：恢复普通窗口行为
         mainWindow.setSkipTaskbar(false);
         mainWindow.setAlwaysOnTop(false);
         stopVisibilityGuardian();
