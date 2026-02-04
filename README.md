@@ -2,6 +2,12 @@
 
 这是一个使用 Electron 开发的高效任务管理应用。
 
+## 下载与发布
+
+你可以在 [GitHub Releases](https://github.com/CreatorOfBucket/YouShouldDO/releases) 页面找到最新的版本并下载源码或查看发行说明。
+
+- **最新正式版本**: [v1.0.0](https://github.com/CreatorOfBucket/YouShouldDO/releases/tag/v1.0.0)
+
 ## 部署说明
 
 只要安装了 Node.js，任何人都可以通过以下简单的步骤在自己的电脑上运行此程序。
