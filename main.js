@@ -37,10 +37,9 @@ function startVisibilityGuardian() {
             return;
         }
 
-        // 只在窗口被"隐藏"时恢复（如 Win+D）
-        // 不设置 alwaysOnTop，这样其他应用可以正常覆盖它
+        // 只在窗口被系统隐藏时（如 Win+D）恢复显示
         if (!mainWindow.isVisible()) {
-            mainWindow.showInactive(); // 显示但不抢占焦点
+            mainWindow.showInactive();
         }
     }, 150);
 }
@@ -58,17 +57,17 @@ ipcMain.on('toggle-pin-desktop', (event, shouldPin) => {
     isPinnedMode = shouldPin;
 
     if (shouldPin) {
-        // 固定模式：
-        // 1. 隐藏任务栏图标
-        // 2. 不设置 alwaysOnTop（允许其他窗口覆盖）
-        // 3. 启动守护进程，只对抗 Win+D
+        // 固定到桌面模式：
+        // 1. 禁止最小化 - 这样 Win+D 不会隐藏它（因为窗口不会被最小化）
+        // 2. 不在任务栏显示 - 像桌面小部件
+        // 3. 不设置 alwaysOnTop - 这样其他应用打开时，它会在后面，不会遮挡
+        mainWindow.setMinimizable(false);
         mainWindow.setSkipTaskbar(true);
-        mainWindow.setAlwaysOnTop(false);
         startVisibilityGuardian();
     } else {
-        // 取消固定：恢复普通窗口行为
+        // 取消固定 - 恢复为普通窗口
+        mainWindow.setMinimizable(true);
         mainWindow.setSkipTaskbar(false);
-        mainWindow.setAlwaysOnTop(false);
         stopVisibilityGuardian();
     }
 });
