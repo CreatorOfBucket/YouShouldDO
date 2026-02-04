@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tasks.push(newTask);
                 saveTasks();
                 renderTask(newTask);
-                
+
                 // Reset input and importance state
                 taskInput.value = '';
                 isImportantMode = false;
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const classes = ['task-item'];
         if (task.completed) classes.push('completed');
         if (task.important) classes.push('important');
-        
+
         li.className = classes.join(' ');
         li.dataset.id = task.id;
 
@@ -98,29 +98,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeOptions = document.querySelectorAll('.theme-btn'); // Fixed class
     const html = document.documentElement;
 
-    // Pin Logic
+    // Position Lock Logic
     const pinBtn = document.getElementById('pin-btn');
-    let isPinned = localStorage.getItem('isPinned') === 'true';
+    const dragRegion = document.querySelector('.drag-region');
+    let isPositionLocked = false;
 
-    // Apply initial state
-    updatePinState(isPinned);
-
-    pinBtn.addEventListener('click', () => {
-        isPinned = !isPinned;
-        updatePinState(isPinned);
-        localStorage.setItem('isPinned', isPinned);
+    // 监听主进程的锁定状态变化
+    ipcRenderer.on('position-lock-changed', (event, locked) => {
+        isPositionLocked = locked;
+        updateLockState(locked);
     });
 
-    function updatePinState(pinned) {
-        if (pinned) {
+    // 获取初始锁定状态
+    ipcRenderer.send('get-position-lock-state');
+
+    pinBtn.addEventListener('click', () => {
+        isPositionLocked = !isPositionLocked;
+        ipcRenderer.send('toggle-position-lock', isPositionLocked);
+        localStorage.setItem('isPositionLocked', isPositionLocked);
+    });
+
+    function updateLockState(locked) {
+        if (locked) {
             pinBtn.classList.add('pinned');
-            pinBtn.title = "Unpin from Desktop";
+            pinBtn.title = "解锁窗口位置";
+            // 禁用拖动
+            dragRegion.style.webkitAppRegion = 'no-drag';
         } else {
             pinBtn.classList.remove('pinned');
-            pinBtn.title = "Pin to Desktop (Ignore Win+D)";
+            pinBtn.title = "锁定窗口位置";
+            // 启用拖动
+            dragRegion.style.webkitAppRegion = 'drag';
         }
-        // Send state to Main Process
-        ipcRenderer.send('toggle-pin-desktop', pinned);
     }
 
     // Load saved theme
@@ -171,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Save preference immediately
         localStorage.setItem('theme', theme);
     }
-    
+
     // System theme change listener
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
         if (localStorage.getItem('theme') === 'system') {
