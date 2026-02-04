@@ -58,10 +58,19 @@ document.addEventListener('DOMContentLoaded', () => {
         li.innerHTML = `
             <label class="checkbox-container">
                 <input type="checkbox" ${task.completed ? 'checked' : ''}>
-                <span class="checkmark"></span>
+                <div class="checkmark-wrapper">
+                    <svg class="checkmark-svg" viewBox="0 0 24 24">
+                        <path class="checkmark-path" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M5 12l5 5l10 -10"/>
+                    </svg>
+                </div>
             </label>
             <span class="task-text">${escapeHtml(task.text)}</span>
-            <button class="delete-btn" title="Delete task">×</button>
+            <button class="delete-btn" title="Delete task">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </button>
         `;
 
         const checkbox = li.querySelector('input[type="checkbox"]');
@@ -73,13 +82,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const deleteBtn = li.querySelector('.delete-btn');
         deleteBtn.addEventListener('click', () => {
-            li.remove();
-            tasks = tasks.filter(t => t.id !== task.id);
-            saveTasks();
+            // Uncheck (visually) immediately if checking out
+            li.style.pointerEvents = 'none'; // Prevent further clicks
+            li.classList.add('is-deleting');
+
+            // Wait for animation to finish
+            setTimeout(() => {
+                li.remove();
+                tasks = tasks.filter(t => t.id !== task.id);
+                saveTasks();
+            }, 400); // Matches CSS animation duration
         });
 
         taskList.appendChild(li);
-        taskList.scrollTop = taskList.scrollHeight;
+        // Only scroll if it's a new task (not re-rendering all) - simple check
+        if (!task.completed) {
+            taskList.scrollTop = taskList.scrollHeight;
+        }
     }
 
     function saveTasks() {
@@ -141,11 +160,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const glassControlSections = document.querySelectorAll('.glass-control');
     const glassOpacityMin = 0.12;
     const glassOpacityMax = 0.92;
-    
+
     // Load & Init Opacity
     // Default higher (75) to provide good contrast against Acrylic's white noise
     const savedOpacity = localStorage.getItem('bgOpacity');
-    setOpacity(savedOpacity !== null ? savedOpacity : '75'); 
+    setOpacity(savedOpacity !== null ? savedOpacity : '75');
 
     opacitySlider.addEventListener('input', (e) => {
         setOpacity(e.target.value);

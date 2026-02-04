@@ -195,23 +195,20 @@ html {
 
 #task-input {
     width: 100%;
-    background: var(--bg-hover);
-    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
     border-radius: var(--radius-md);
-    padding: 10px 12px;
+    padding: 12px 14px;
     color: var(--text-primary);
     font-family: var(--font-family);
-    font-size: 14px;
+    font-size: 15px;
     outline: none;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 #task-input:focus {
-    background: var(--bg-hover);
-    /* Keep consistent or slightly darker/lighter */
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(96, 205, 255, 0.2);
-    /* Consider variable for shadow color if needed */
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb, 10, 132, 255), 0.3);
 }
 
 #task-input::placeholder {
@@ -268,7 +265,7 @@ html {
     min-height: 0;
     overflow-y: auto;
     list-style: none;
-    padding: 0 8px 40px 8px;
+    padding: 8px 12px 40px 12px;
 }
 
 /* Custom Scrollbar */
@@ -293,11 +290,34 @@ html {
 .task-item {
     display: flex;
     align-items: center;
-    padding: 8px 12px;
-    margin-bottom: 4px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
     border-radius: var(--radius-md);
-    transition: background 0.2s ease;
+    transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
     cursor: default;
+
+    /* For exit animation */
+    max-height: 60px;
+    /* Arbitrary large enough height */
+    opacity: 1;
+    overflow: hidden;
+}
+
+.task-item.is-deleting {
+    opacity: 0;
+    transform: scale(0.95);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    transition:
+        opacity 0.3s ease,
+        transform 0.3s ease,
+        max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+        /* Delay height shrink slightly */
+        margin-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+        padding 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+    pointer-events: none;
 }
 
 .task-item:hover {
@@ -311,14 +331,40 @@ html {
     color: var(--text-primary);
 }
 
-/* Checkbox Styling */
+/* Checkbox Styling with Spring & SVG Animation */
+@keyframes spring {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(0.9);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes draw-check {
+    0% {
+        stroke-dashoffset: 24;
+    }
+
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+
 .checkbox-container {
-    display: block;
+    display: flex;
+    align-items: center;
     position: relative;
-    padding-left: 20px;
+    padding-left: 24px;
     cursor: pointer;
     -webkit-user-select: none;
     user-select: none;
+    height: 18px;
 }
 
 .checkbox-container input {
@@ -329,51 +375,50 @@ html {
     width: 0;
 }
 
-.checkmark {
+.checkmark-wrapper {
     position: absolute;
-    top: -9px;
-    /* Center vertically relative to text */
+    top: 0;
     left: 0;
     height: 18px;
     width: 18px;
     background-color: transparent;
-    border: 2px solid var(--text-secondary);
+    border: 1.5px solid var(--text-secondary);
     border-radius: 50%;
-    /* Circle for modern look */
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.checkbox-container:hover input~.checkmark {
-    border-color: var(--text-primary);
-    background-color: var(--bg-hover);
-}
-
-.checkbox-container input:checked~.checkmark {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-}
-
-.checkmark:after {
-    content: "";
-    position: absolute;
-    display: none;
-}
-
-.checkbox-container input:checked~.checkmark:after {
+.checkmark-svg {
+    width: 12px;
+    height: 12px;
     display: block;
 }
 
-.checkbox-container .checkmark:after {
-    left: 5px;
-    top: 2px;
-    width: 4px;
-    height: 8px;
-    border: solid white;
-    /* Checkmark color always white on accent */
-    border-width: 0 2px 2px 0;
-    -webkit-transform: rotate(45deg);
-    -ms-transform: rotate(45deg);
-    transform: rotate(45deg);
+.checkmark-path {
+    stroke-dasharray: 24;
+    stroke-dashoffset: 24;
+    /* Hidden by default */
+    transition: stroke-dashoffset 0.3s ease 0.1s;
+    /* Delayed slightly */
+}
+
+.checkbox-container:hover input~.checkmark-wrapper {
+    border-color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.checkbox-container input:checked~.checkmark-wrapper {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    animation: spring 0.4s ease;
+}
+
+.checkbox-container input:checked~.checkmark-wrapper .checkmark-path {
+    stroke-dashoffset: 0;
+    /* Draw it */
+    animation: draw-check 0.4s ease forwards;
 }
 
 /* Completed State */
@@ -390,22 +435,29 @@ html {
     color: var(--text-secondary);
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.2s ease, color 0.2s ease;
-    padding: 4px;
-    border-radius: 4px;
-    font-size: 16px;
+    transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
+    padding: 6px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.task-item:hover .delete-btn {
-    opacity: 1;
+.delete-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2px;
 }
 
-.delete-btn:hover {
+.task-item:hover .delete-btn {
+    opacity: 0.6;
+}
+
+.task-item:hover .delete-btn:hover {
+    opacity: 1;
     color: var(--danger-color);
-    background: rgba(255, 95, 95, 0.1);
+    background: rgba(255, 69, 58, 0.1);
+    transform: scale(1.05);
 }
 
 /* Settings Modal */
