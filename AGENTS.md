@@ -1,109 +1,128 @@
 # YouShouldDO - Agent Guidelines
 
-An Electron-based task management app with glass-morphism UI and desktop pinning features.
+Electron-based task manager with glass-morphism UI and desktop pinning.
 
-## Build/Test Commands
+## Editor Rules
+
+- No `.cursorrules`, `.cursor/rules/`, or `.github/copilot-instructions.md` found in this repo.
+
+## Build / Run / Test
 
 ```bash
 # Install dependencies
 npm install
 
-# Run the application
+# Run the app
 npm start
 
-# Note: Testing framework not yet configured
-# To add testing: npm install --save-dev jest
-# Then update package.json scripts.test
+# Tests (placeholder - currently fails)
+npm test
 ```
+
+- Build step: none configured (app runs via Electron directly).
+- Lint/format: none configured (no ESLint/Prettier config found).
+- Single-test command: not available until a test runner is added.
+- If a runner is added later (e.g., Jest), the conventional single test would be:
+  `npm test -- <test-file>`.
 
 ## Code Style Guidelines
 
 ### JavaScript (ES6+)
 
-**General Principles:**
-- Use `const` by default, `let` when reassignment needed
-- Prefer arrow functions for callbacks
-- Use template literals for string interpolation
-- Follow 4-space indentation
-- Use semicolons (see existing code pattern)
+- Indentation: 4 spaces; no tabs.
+- Semicolons: required.
+- Quotes: single quotes in JS.
+- Prefer `const`, use `let` when reassignment is necessary.
+- Prefer arrow functions for callbacks.
+- Use template literals for HTML snippets and string interpolation.
+- Keep functions small and purpose-focused.
 
-**Naming Conventions:**
-- Variables/functions: camelCase (`taskList`, `createWindow`)
-- DOM elements: descriptive IDs (`task-input`, `settings-btn`)
-- CSS classes: kebab-case (`task-item`, `checkbox-container`)
-- Constants: UPPER_SNAKE_CASE for true constants
+### Imports and Modules
 
-**Imports:**
-- Main process: Use CommonJS (`const { app } = require('electron')`)
-- Renderer: ES6 modules or Electron's `require()`
-- Node built-ins: `const path = require('path')`
+- Main process uses CommonJS: `const { app } = require('electron')`.
+- Renderer uses `require('electron')` within `DOMContentLoaded` scope.
+- Node built-ins use CommonJS: `const path = require('path')`.
+
+### Naming
+
+- Variables/functions: `camelCase` (e.g., `createWindow`, `taskList`).
+- Constants: `UPPER_SNAKE_CASE` only for true constants.
+- DOM IDs: kebab-case (e.g., `task-input`, `settings-btn`).
+- CSS classes: kebab-case, BEM-like structure where helpful.
 
 ### Electron Patterns
 
-**Main Process (main.js):**
-- Export app lifecycle handlers
-- Use `ipcMain.on()` for renderer communication
-- Manage window state in module-level variables
-- Clean up resources in `window.on('closed')`
+- Main process keeps window/tray state in module-level variables.
+- `createWindow()` and `createTray()` are the primary setup functions.
+- Use `ipcMain.on()` / `ipcRenderer.send()` for IPC.
+- Use `event.reply()` or `webContents.send()` for replies.
+- Guard `mainWindow` access before use.
+- Window close behavior hides window unless app is quitting.
 
-**Renderer Process (renderer.js):**
-- Wrap in `DOMContentLoaded` listener
-- Use `ipcRenderer.send()` for main process communication
-- Access Electron APIs via `require('electron')`
+### Renderer Patterns
 
-### CSS Guidelines
+- Wrap renderer logic in `DOMContentLoaded`.
+- Use `escapeHtml()` before inserting user content into `innerHTML`.
+- Use `dataset` and `classList` for DOM state.
+- Keep event handlers close to the DOM elements they manage.
 
-**Variables:**
-- Define in `:root` with `--` prefix
-- Theme overrides in `html[data-theme="..."]` selectors
-- Use semantic names: `--bg-app`, `--text-primary`, `--accent-color`
+### HTML
 
-**Structure:**
-- BEM-like naming: `.component-element-modifier`
-- Flexbox for layout
-- `transition` for interactive elements (0.2s ease)
-- `-webkit-app-region: drag` for draggable areas
+- Indentation: 4 spaces.
+- Attributes use double quotes.
+- Keep structure semantic (header, input area, list, modal).
+- IDs are referenced directly in `renderer.js`.
+
+### CSS
+
+- Use CSS variables in `:root` and theme overrides in `html[data-theme="..."]`.
+- Prefer semantic variables: `--bg-app`, `--text-primary`, `--accent-color`.
+- Use flexbox for layout.
+- Prefer transitions in the 0.2s to 0.3s range.
+- Use `-webkit-app-region: drag` for draggable areas.
 
 ### Data Persistence
 
-- Use `localStorage` for user preferences and task data
-- Keys: `tasks`, `theme`, `isPinned`
-- Always `JSON.parse()` on retrieval, `JSON.stringify()` on save
-- Sanitize user input with `escapeHtml()` before DOM insertion
+- Use `localStorage` for user state and preferences.
+- Current keys: `tasks`, `theme`, `bgOpacity`, `isPositionLocked`.
+- Always `JSON.parse()` on read and `JSON.stringify()` on write.
 
 ### Error Handling
 
-- Guard against null/undefined before DOM operations
-- Validate IPC message data before processing
-- Use optional chaining where appropriate (`mainWindow?.isVisible()`)
+- Guard for null/undefined DOM references before use.
+- Validate IPC payloads before acting on them.
+- Avoid empty `catch` blocks.
 
 ### Comments
 
-- English preferred for codebase consistency
-- Use inline comments for non-obvious logic
-- Document Electron API quirks and workarounds
+- Use English comments for non-obvious logic.
+- Document Electron API quirks and platform limitations.
 
-## File Structure
+## Files and Structure
 
 ```
 youshoulddo/
 ├── main.js           # Electron main process
 ├── renderer.js       # UI logic and IPC
 ├── index.html        # Application markup
-├── styles.css        # Themed styling
-├── package.json      # Dependencies (electron)
+├── styles.css        # Styling and theme variables
+├── package.json      # Scripts and dependencies
 └── .gitignore        # node_modules/, dist/
 ```
 
 ## Testing (Not Yet Implemented)
 
-To run single test when Jest is added:
-```bash
-npm test -- renderer.test.js
-```
+- No test framework configured.
+- Placeholder `npm test` fails by design.
+- When a runner is added, keep single-test syntax in `package.json`.
+
+## Assets and Platform Notes
+
+- App icons are loaded from `icon.png`, `icon.ico`, or `icon.svg`.
+- Windows acrylic blur uses `backgroundMaterial: 'acrylic'`.
 
 ## Git Workflow
 
-- Feature branches from main
-- Atomic commits with descriptive messages
-- No commits of node_modules/ or dist/
+- Feature branches from `main`.
+- Atomic commits with descriptive messages.
+- Do not commit `node_modules/` or `dist/`.
