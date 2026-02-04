@@ -37,7 +37,7 @@ ipcMain.on('toggle-pin-desktop', (event, shouldPin) => {
         mainWindow.setSkipTaskbar(true);
         mainWindow.setMinimizable(false);
         mainWindow.setAlwaysOnTop(false);
-        
+
         // Win+D Defense Strategy:
         // If hidden by Win+D, we force show it.
         startVisibilityGuardian();
@@ -55,42 +55,21 @@ let guardianInterval = null;
 
 function startVisibilityGuardian() {
     if (guardianInterval) clearInterval(guardianInterval);
-    
+
     guardianInterval = setInterval(() => {
         if (!mainWindow) {
             clearInterval(guardianInterval);
             return;
         }
-        
-        // If window is hidden, show it!
-        if (!mainWindow.isVisible()) {
-            mainWindow.show();
-            mainWindow.setAlwaysOnTop(false); // Ensure it stays on desktop level
-        }
-    }, 100);
-}
-});
 
-// Visibility Guardian
-// Since Win+D is a system-level hook, we detect if we're hidden and force show
-let guardianInterval = null;
-
-function startVisibilityGuardian() {
-    if (guardianInterval) clearInterval(guardianInterval);
-    
-    guardianInterval = setInterval(() => {
-        if (!mainWindow) {
-            clearInterval(guardianInterval);
-            return;
-        }
-        
-        // If window is hidden, show it!
+        // 如果窗口被隐藏（如 Win+D），重新显示它
         if (!mainWindow.isVisible()) {
             mainWindow.show();
             mainWindow.setAlwaysOnTop(true, 'screen-saver');
         }
-    }, 100); // Check every 100ms for aggressive resistance
+    }, 100); // 每100ms检测一次
 }
+
 
 app.whenReady().then(() => {
     createWindow();
