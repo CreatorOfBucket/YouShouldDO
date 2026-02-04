@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -11,11 +11,13 @@ function createWindow() {
         width: 350,
         height: 600,
         frame: false,
-        transparent: true,
+        transparent: false, // 使用 backgroundMaterial 时需要关闭 transparent
         resizable: false,
         alwaysOnTop: false,
         skipTaskbar: true, // 默认不显示在任务栏，由托盘控制
         icon: getAppIcon(), // 设置窗口图标
+        backgroundColor: '#00000000',
+        backgroundMaterial: 'acrylic', // Windows 11 原生模糊效果
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
@@ -23,6 +25,21 @@ function createWindow() {
     });
 
     mainWindow.loadFile('index.html');
+
+    // 窗口加载完成后发送初始位置
+    mainWindow.webContents.on('did-finish-load', () => {
+        sendWindowContext();
+    });
+
+    // 窗口移动时通知渲染进程更新背景位置
+    mainWindow.on('move', () => {
+        sendWindowContext();
+    });
+
+    // 窗口显示时刷新背景
+    mainWindow.on('show', () => {
+        sendWindowContext();
+    });
 
     // 拦截关闭事件：点击关闭按钮时隐藏窗口而不是退出
     mainWindow.on('close', (event) => {
@@ -133,6 +150,25 @@ ipcMain.on('toggle-position-lock', (event, shouldLock) => {
 // 获取当前锁定状态
 ipcMain.on('get-position-lock-state', (event) => {
     event.reply('position-lock-changed', isPositionLocked);
+});
+
+// 发送窗口位置和显示器信息给渲染进程
+function sendWindowContext() {
+    if (!mainWindow) return;
+    const bounds = mainWindow.getBounds();
+    const display = screen.getDisplayMatching(bounds);
+    mainWindow.webContents.send('window-context', {
+        windowBounds: bounds,
+        displayBounds: display.bounds,
+        displaySize: display.size,
+        scaleFactor: display.scaleFactor,
+        displayId: display.id
+    });
+}
+
+// 响应渲染进程请求窗口上下文
+ipcMain.on('request-window-context', () => {
+    sendWindowContext();
 });
 
 app.whenReady().then(() => {

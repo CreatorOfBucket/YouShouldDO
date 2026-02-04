@@ -4,15 +4,17 @@
     --glass-opacity: 0.72;
     --glass-blur: 20px;
     --bg-opacity: var(--glass-opacity);
-    
+
     /* Default (Glass) Theme Variables */
     --bg-app: rgba(var(--bg-base-color), var(--bg-opacity));
     --bg-hover: rgba(255, 255, 255, 0.08);
     --border-color: rgba(255, 255, 255, 0.14);
     --text-primary: #f9f9f9;
     --text-secondary: rgba(255, 255, 255, 0.72);
-    --accent-color: #0A84FF; /* Apple Blue */
-    --danger-color: #FF453A; /* Apple Red */
+    --accent-color: #0A84FF;
+    /* Apple Blue */
+    --danger-color: #FF453A;
+    /* Apple Red */
     --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --radius-lg: 12px;
     --radius-md: 8px;
@@ -61,15 +63,19 @@ html[data-theme="dark"] {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    user-select: none; /* UI feel */
+    user-select: none;
+    /* UI feel */
 }
 
-body, html {
+body,
+html {
     height: 100%;
     width: 100%;
-    overflow: hidden; /* Prevent body scroll, handle in container */
+    overflow: hidden;
+    /* Prevent body scroll, handle in container */
     font-family: var(--font-family);
-    background: transparent; /* Crucial for Electron transparency */
+    background: transparent;
+    /* Crucial for Electron transparency */
     color: var(--text-primary);
 }
 
@@ -80,19 +86,25 @@ body, html {
     height: 100vh;
     background: var(--bg-app);
     border: 1px solid var(--border-color);
-    border-radius: 0; /* Acrylic 模式下圆角由系统控制 */
+    border-radius: 0;
+    /* Acrylic 模式下圆角由系统控制 */
     overflow: hidden;
-    box-shadow: none; /* Acrylic 有自己的阴影效果 */
-    position: relative; /* For modal positioning */
-    isolation: isolate; /* Create stacking context */
+    box-shadow: none;
+    /* Acrylic 有自己的阴影效果 */
+    position: relative;
+    /* For modal positioning */
+    isolation: isolate;
+    /* Create stacking context */
     transition: background var(--transition-speed) ease, border-color var(--transition-speed) ease;
-    backdrop-filter: blur(var(--blur-strength)) saturate(140%); /* For Glass theme internal blur */
+    backdrop-filter: blur(var(--blur-strength)) saturate(140%);
+    /* For Glass theme internal blur */
     -webkit-backdrop-filter: blur(var(--blur-strength)) saturate(140%);
 }
 
 /* Blur Background Layer - 使用 Acrylic 时这个层作为颜色叠加 */
 .blur-background {
-    display: none; /* Acrylic 模式下不需要这个层 */
+    display: none;
+    /* Acrylic 模式下不需要这个层 */
 }
 
 /* Color Overlay - Acrylic 模式下不需要单独的覆盖层 */
@@ -100,8 +112,8 @@ body, html {
     display: none;
 }
 
-/* 确保所有内容在背景层之上 */
-.app-container > *:not(.blur-background) {
+/* 确保所有内容在背景层之上，但排除绝对定位的模态框 */
+.app-container>*:not(.blur-background):not(.settings-modal) {
     position: relative;
     z-index: 2;
 }
@@ -112,8 +124,10 @@ body, html {
     display: flex;
     align-items: center;
     padding: 0 16px;
-    -webkit-app-region: drag; /* Electron drag support */
-    background: transparent; /* Let app bg show through */
+    -webkit-app-region: drag;
+    /* Electron drag support */
+    background: transparent;
+    /* Let app bg show through */
     border-bottom: 1px solid var(--border-color);
     flex-shrink: 0;
 }
@@ -144,7 +158,8 @@ body, html {
     display: flex;
     align-items: center;
     justify-content: center;
-    -webkit-app-region: no-drag; /* Important: allow clicking */
+    -webkit-app-region: no-drag;
+    /* Important: allow clicking */
 }
 
 .icon-btn:hover {
@@ -161,7 +176,8 @@ body, html {
 /* Pin Button Specifics */
 .icon-btn.pinned {
     color: var(--accent-color);
-    background: rgba(96, 205, 255, 0.15); /* Light accent background */
+    background: rgba(96, 205, 255, 0.15);
+    /* Light accent background */
 }
 
 .icon-btn.pinned:hover {
@@ -191,9 +207,11 @@ body, html {
 }
 
 #task-input:focus {
-    background: var(--bg-hover); /* Keep consistent or slightly darker/lighter */
+    background: var(--bg-hover);
+    /* Keep consistent or slightly darker/lighter */
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(96, 205, 255, 0.2); /* Consider variable for shadow color if needed */
+    box-shadow: 0 0 0 2px rgba(96, 205, 255, 0.2);
+    /* Consider variable for shadow color if needed */
 }
 
 #task-input::placeholder {
@@ -233,11 +251,12 @@ body, html {
 /* Important Task Item */
 .task-item.important {
     border-left: 3px solid var(--danger-color);
-    padding-left: 9px; /* 12px original padding - 3px border */
+    padding-left: 9px;
+    /* 12px original padding - 3px border */
     background: rgba(255, 95, 95, 0.05);
 }
 
-.task-item.important .checkbox-container input:checked ~ .checkmark {
+.task-item.important .checkbox-container input:checked~.checkmark {
     background-color: var(--danger-color);
     border-color: var(--danger-color);
 }
@@ -245,9 +264,11 @@ body, html {
 /* Task List */
 .task-list {
     flex-grow: 1;
+    flex-shrink: 1;
+    min-height: 0;
     overflow-y: auto;
     list-style: none;
-    padding: 0 8px 16px 8px;
+    padding: 0 8px 40px 8px;
 }
 
 /* Custom Scrollbar */
@@ -310,22 +331,24 @@ body, html {
 
 .checkmark {
     position: absolute;
-    top: -9px; /* Center vertically relative to text */
+    top: -9px;
+    /* Center vertically relative to text */
     left: 0;
     height: 18px;
     width: 18px;
     background-color: transparent;
     border: 2px solid var(--text-secondary);
-    border-radius: 50%; /* Circle for modern look */
+    border-radius: 50%;
+    /* Circle for modern look */
     transition: all 0.2s ease;
 }
 
-.checkbox-container:hover input ~ .checkmark {
+.checkbox-container:hover input~.checkmark {
     border-color: var(--text-primary);
     background-color: var(--bg-hover);
 }
 
-.checkbox-container input:checked ~ .checkmark {
+.checkbox-container input:checked~.checkmark {
     background-color: var(--accent-color);
     border-color: var(--accent-color);
 }
@@ -336,7 +359,7 @@ body, html {
     display: none;
 }
 
-.checkbox-container input:checked ~ .checkmark:after {
+.checkbox-container input:checked~.checkmark:after {
     display: block;
 }
 
@@ -345,7 +368,8 @@ body, html {
     top: 2px;
     width: 4px;
     height: 8px;
-    border: solid white; /* Checkmark color always white on accent */
+    border: solid white;
+    /* Checkmark color always white on accent */
     border-width: 0 2px 2px 0;
     -webkit-transform: rotate(45deg);
     -ms-transform: rotate(45deg);
@@ -422,7 +446,7 @@ body, html {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     padding: 16px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
     transform: scale(0.95);
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s ease, border-color 0.25s ease;
 }
@@ -542,6 +566,7 @@ body, html {
 #opacity-slider {
     flex-grow: 1;
     -webkit-appearance: none;
+    appearance: none;
     height: 4px;
     background: var(--bg-hover);
     border-radius: 2px;
@@ -556,7 +581,7 @@ input[type="range"]::-webkit-slider-thumb {
     background: var(--text-primary);
     border-radius: 50%;
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     border: 2px solid var(--bg-app);
     transition: transform 0.1s ease;
 }

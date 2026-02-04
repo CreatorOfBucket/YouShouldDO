@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
     const { ipcRenderer } = require('electron');
 
+    // --- DOM References ---
+    const html = document.documentElement;
+
     // --- Task Logic ---
     const taskInput = document.getElementById('task-input');
     const taskList = document.querySelector('.task-list');
@@ -96,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeSettingsBtn = document.getElementById('close-modal-btn'); // Fixed ID
     const confirmSettingsBtn = document.getElementById('confirm-settings-btn'); // New Button
     const themeOptions = document.querySelectorAll('.theme-btn'); // Fixed class
-    const html = document.documentElement;
+    // html 已在文件顶部定义
 
     // Position Lock Logic
     const pinBtn = document.getElementById('pin-btn');
@@ -132,8 +135,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Glass Density (Opacity) Logic ---
+    const opacitySlider = document.getElementById('opacity-slider');
+    const opacityValueLabel = document.getElementById('opacity-value');
+    const glassControlSections = document.querySelectorAll('.glass-control');
+    const glassOpacityMin = 0.12;
+    const glassOpacityMax = 0.92;
+    
+    // Load & Init Opacity
+    // Default higher (75) to provide good contrast against Acrylic's white noise
+    const savedOpacity = localStorage.getItem('bgOpacity');
+    setOpacity(savedOpacity !== null ? savedOpacity : '75'); 
+
+    opacitySlider.addEventListener('input', (e) => {
+        setOpacity(e.target.value);
+    });
+
+    function setOpacity(value, shouldPersist = true) {
+        const numericValue = Number(value);
+        const opacityFloat = glassOpacityMin + (numericValue / 100) * (glassOpacityMax - glassOpacityMin);
+
+        html.style.setProperty('--glass-opacity', opacityFloat.toFixed(2));
+
+        opacitySlider.value = String(numericValue);
+        opacityValueLabel.textContent = `${numericValue}%`;
+
+        if (shouldPersist) {
+            localStorage.setItem('bgOpacity', String(numericValue));
+        }
+    }
+
+
+
     // Load saved theme
-    const savedTheme = localStorage.getItem('theme') || 'glass';
+
+    // Load saved theme
+    let savedTheme = localStorage.getItem('theme') || 'glass';
+    if (savedTheme === 'system') savedTheme = 'glass';
     applyTheme(savedTheme);
 
     // Toggle Modal
@@ -170,21 +208,30 @@ document.addEventListener('DOMContentLoaded', () => {
             opt.classList.toggle('active', opt.dataset.theme === theme);
         });
 
-        if (theme === 'system') {
-            const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            html.setAttribute('data-theme', isDark ? 'dark' : 'light');
-        } else {
-            html.setAttribute('data-theme', theme);
+        let effectiveTheme = theme;
+        // System theme logic removed
+
+
+        html.setAttribute('data-theme', effectiveTheme);
+
+        const isGlass = theme === 'glass';
+        if (isGlass) {
+            const savedOpacity = localStorage.getItem('bgOpacity') || '75';
+            setOpacity(savedOpacity, false);
         }
+
+        setGlassControlsEnabled(isGlass);
 
         // Save preference immediately
         localStorage.setItem('theme', theme);
     }
 
-    // System theme change listener
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-        if (localStorage.getItem('theme') === 'system') {
-            html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-        }
-    });
+    function setGlassControlsEnabled(enabled) {
+        opacitySlider.disabled = !enabled;
+        glassControlSections.forEach(section => {
+            section.classList.toggle('is-disabled', !enabled);
+        });
+    }
+
+
 });
