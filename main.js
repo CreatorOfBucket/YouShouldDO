@@ -2,56 +2,31 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
 let mainWindow;
+let guardianInterval = null;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 350,
         height: 600,
-        frame: false, // Frameless window
-        transparent: true, // Transparent background
-        resizable: false, // Widget-style fixed size (user can't resize)
-        alwaysOnTop: false, // Optional: true if user wants it purely as a widget overlay
+        frame: false,
+        transparent: true,
+        resizable: false,
+        alwaysOnTop: false,
         skipTaskbar: false,
         webPreferences: {
-            nodeIntegration: true, // For simple local apps this is fine, though contextIsolation: true is safer.
-            contextIsolation: false // Disabling isolation to allow direct renderer usage for now.
+            nodeIntegration: true,
+            contextIsolation: false
         },
-        icon: path.join(__dirname, 'icon.png') // If we had one
+        icon: path.join(__dirname, 'icon.png')
     });
 
     mainWindow.loadFile('index.html');
 
-    // Open DevTools for debugging (comment out in production)
-    // mainWindow.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+        if (guardianInterval) clearInterval(guardianInterval);
+    });
 }
-
-// IPC Listener for Pinning (Desktop Mode)
-ipcMain.on('toggle-pin-desktop', (event, shouldPin) => {
-    if (!mainWindow) return;
-
-    if (shouldPin) {
-        // Pinned Mode:
-        // 1. skipTaskbar: true to hide from taskbar
-        // 2. minimizable: false to prevent minimize
-        // 3. alwaysOnTop: FALSE (Stays on desktop level, below other windows)
-        mainWindow.setSkipTaskbar(true);
-        mainWindow.setMinimizable(false);
-        mainWindow.setAlwaysOnTop(false);
-
-        // Win+D Defense Strategy:
-        // If hidden by Win+D, we force show it.
-        startVisibilityGuardian();
-    } else {
-        // Unpinned Mode:
-        mainWindow.setSkipTaskbar(false);
-        mainWindow.setMinimizable(true);
-        mainWindow.setAlwaysOnTop(false);
-    }
-});
-
-// Visibility Guardian
-// Since Win+D is a system-level hook, we detect if we're hidden and force show
-let guardianInterval = null;
 
 function startVisibilityGuardian() {
     if (guardianInterval) clearInterval(guardianInterval);
@@ -62,14 +37,41 @@ function startVisibilityGuardian() {
             return;
         }
 
-        // 如果窗口被隐藏（如 Win+D），重新显示它
-        if (!mainWindow.isVisible()) {
-            mainWindow.show();
+        // 核心技术：强力对抗 Win+D
+        // 1. 如果窗口被隐藏或最小化，立刻恢复
+        // 2. 维持最高级别的置顶
+        if (!mainWindow.isVisible() || mainWindow.isMinimized()) {
+            mainWindow.restore(); // 恢复最小化
+            mainWindow.show();    // 确保显示
             mainWindow.setAlwaysOnTop(true, 'screen-saver');
         }
-    }, 100); // 每100ms检测一次
+    }, 100);
 }
 
+function stopVisibilityGuardian() {
+    if (guardianInterval) {
+        clearInterval(guardianInterval);
+        guardianInterval = null;
+    }
+}
+
+ipcMain.on('toggle-pin-desktop', (event, shouldPin) => {
+    if (!mainWindow) return;
+
+    if (shouldPin) {
+        // 开启固定模式：禁止最小化，隐藏任务栏图标，最高级置顶
+        mainWindow.setMinimizable(false);
+        mainWindow.setSkipTaskbar(true);
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        startVisibilityGuardian();
+    } else {
+        // 关闭固定模式：恢复普通窗口行为
+        mainWindow.setMinimizable(true);
+        mainWindow.setSkipTaskbar(false);
+        mainWindow.setAlwaysOnTop(false);
+        stopVisibilityGuardian();
+    }
+});
 
 app.whenReady().then(() => {
     createWindow();
