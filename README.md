@@ -6,17 +6,21 @@
 
 ### 软件界面
 
-![YouShouldDO Screenshot](assets/screenshot.png)
+<p align="center">
+    <img src="assets/screenshot.png" alt="YouShouldDO Screenshot" width="340" />
+</p>
 
 ### 使用演示
 
-**添加事项**
+<p align="center">
+    <strong>添加事项</strong><br />
+    <img src="assets/add-task.gif" alt="Add task demo" width="340" />
+</p>
 
-![Add task demo](assets/add-task.gif)
-
-**删除事项**
-
-![Delete task demo](assets/delete-task.gif)
+<p align="center">
+    <strong>删除事项</strong><br />
+    <img src="assets/delete-task.gif" alt="Delete task demo" width="340" />
+</p>
 
 ## 下载与发布
 
