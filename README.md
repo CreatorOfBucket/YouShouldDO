@@ -2,6 +2,22 @@
 
 这是一个使用 Electron 开发的高效任务管理应用。
 
+## 预览
+
+### 软件界面
+
+![YouShouldDO Screenshot](assets/screenshot.png)
+
+### 使用演示
+
+**添加事项**
+
+![Add task demo](assets/add-task.gif)
+
+**删除事项**
+
+![Delete task demo](assets/delete-task.gif)
+
 ## 下载与发布
 
 你可以在 [GitHub Releases](https://github.com/CreatorOfBucket/YouShouldDO/releases) 页面找到最新的版本并下载 **Windows 安装包**（推荐）或查看发行说明。
