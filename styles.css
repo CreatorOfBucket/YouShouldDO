@@ -5,17 +5,21 @@
     --glass-blur: 20px;
     --bg-opacity: var(--glass-opacity);
 
+    /* Glass layering variables */
+    --glass-highlight-opacity: 0.08;
+    --glass-border-opacity: 0.14;
+    --glass-unfocused-boost: 0.24; /* Extra opacity added when window loses focus */
+
     /* Default (Glass) Theme Variables */
     --bg-app: rgba(var(--bg-base-color), var(--bg-opacity));
     --bg-hover: rgba(255, 255, 255, 0.08);
-    --border-color: rgba(255, 255, 255, 0.14);
+    --border-color: rgba(255, 255, 255, var(--glass-border-opacity));
     --text-primary: #f9f9f9;
     --text-secondary: rgba(255, 255, 255, 0.72);
     --accent-color: #0A84FF;
-    /* Apple Blue */
+    --accent-color-rgb: 10, 132, 255;
     --danger-color: #FF453A;
-    /* Apple Red */
-    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-family: 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
     --radius-lg: 12px;
     --radius-md: 8px;
     --radius-sm: 4px;
@@ -29,7 +33,7 @@ html[data-theme="glass"] {
     --bg-opacity: var(--glass-opacity);
     --bg-app: rgba(var(--bg-base-color), var(--bg-opacity));
     --bg-hover: rgba(255, 255, 255, 0.08);
-    --border-color: rgba(255, 255, 255, 0.14);
+    --border-color: rgba(255, 255, 255, var(--glass-border-opacity));
     --text-primary: #f9f9f9;
     --text-secondary: rgba(255, 255, 255, 0.72);
     --blur-strength: var(--glass-blur);
@@ -84,20 +88,25 @@ html {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background: var(--bg-app);
+    /* Glass gradient: lighter at top (light from above), darker at bottom */
+    background: linear-gradient(
+        180deg,
+        rgba(var(--bg-base-color), calc(var(--bg-opacity) - 0.08)) 0%,
+        rgba(var(--bg-base-color), var(--bg-opacity)) 40%,
+        rgba(var(--bg-base-color), calc(var(--bg-opacity) + 0.04)) 100%
+    );
     border: 1px solid var(--border-color);
-    border-radius: 0;
-    /* Acrylic 模式下圆角由系统控制 */
+    border-top-color: rgba(255, 255, 255, 0.22);
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: none;
-    /* Acrylic 有自己的阴影效果 */
+    /* Inner glow at top edge — gives glass depth */
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.09),
+                inset 0 0 20px 0 rgba(255, 255, 255, 0.02);
     position: relative;
-    /* For modal positioning */
     isolation: isolate;
-    /* Create stacking context */
-    transition: background var(--transition-speed) ease, border-color var(--transition-speed) ease;
+    transition: background 0.25s ease-out, border-color 0.25s ease-out;
+    /* CSS blur — works on transparent windows, no DWM dependency */
     backdrop-filter: blur(var(--blur-strength)) saturate(140%);
-    /* For Glass theme internal blur */
     -webkit-backdrop-filter: blur(var(--blur-strength)) saturate(140%);
 }
 
@@ -107,15 +116,59 @@ html {
     /* Acrylic 模式下不需要这个层 */
 }
 
-/* Color Overlay - Acrylic 模式下不需要单独的覆盖层 */
+/* Glass noise texture layer — fractal noise for frosted-glass grain */
 .app-container::before {
-    display: none;
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 300px 300px;
+    opacity: 1;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    transition: opacity 0.25s ease-out;
+}
+
+/* Glass top-edge luminosity highlight — simulates light catching the glass rim */
+.app-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    z-index: 1;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.15) 10%,
+        rgba(255, 255, 255, 0.25) 50%,
+        rgba(255, 255, 255, 0.15) 90%,
+        transparent 100%);
+    pointer-events: none;
+    transition: opacity 0.25s ease-out;
 }
 
 /* 确保所有内容在背景层之上，但排除绝对定位的模态框 */
 .app-container>*:not(.blur-background):not(.settings-modal) {
     position: relative;
     z-index: 2;
+}
+
+/* Non-glass themes: override gradient background to flat color, remove glass effects */
+html[data-theme="light"] .app-container,
+html[data-theme="dark"] .app-container {
+    background: var(--bg-app);
+    border-top-color: var(--border-color);
+    box-shadow: none;
+}
+
+html[data-theme="light"] .app-container::before,
+html[data-theme="dark"] .app-container::before,
+html[data-theme="light"] .app-container::after,
+html[data-theme="dark"] .app-container::after {
+    display: none;
 }
 
 /* Header / Drag Region */
@@ -428,8 +481,45 @@ html {
     opacity: 0.6;
 }
 
-.delete-btn {
+.toggle-importance-btn {
     margin-left: auto;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toggle-importance-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2px;
+}
+
+.task-item:hover .toggle-importance-btn {
+    opacity: 0.6;
+}
+
+.task-item:hover .toggle-importance-btn:hover {
+    opacity: 1;
+    color: var(--danger-color);
+    background: rgba(255, 69, 58, 0.1);
+    transform: scale(1.05);
+}
+
+.task-item.important .toggle-importance-btn {
+    opacity: 1;
+    color: var(--danger-color);
+}
+
+.delete-btn {
+    margin-left: 4px;
     background: transparent;
     border: none;
     color: var(--text-secondary);
@@ -606,54 +696,4 @@ html {
 
 .confirm-btn:hover {
     opacity: 0.9;
-}
-
-/* Range Slider Styling */
-.range-container {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-#opacity-slider {
-    flex-grow: 1;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 4px;
-    background: var(--bg-hover);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
-    background: var(--text-primary);
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    border: 2px solid var(--bg-app);
-    transition: transform 0.1s ease;
-}
-
-input[type="range"]::-webkit-slider-thumb:hover {
-    transform: scale(1.1);
-}
-
-#opacity-value {
-    font-size: 12px;
-    color: var(--text-secondary);
-    width: 44px;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-.settings-section.glass-control.is-disabled {
-    opacity: 0.5;
-}
-
-.settings-section.glass-control.is-disabled input[type="range"] {
-    cursor: not-allowed;
 }

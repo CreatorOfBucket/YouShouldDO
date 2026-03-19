@@ -1,14 +1,41 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const { ipcRenderer } = require('electron');
+    // Use the safe electronAPI exposed via preload.js / contextBridge
+    // instead of directly requiring electron (security improvement).
+    const api = window.electronAPI;
+    const utils = window.appUtils;
 
-    // --- DOM References ---
+    if (!api) {
+        console.error('[renderer] electronAPI not found. Preload script may have failed.');
+        return;
+    }
+    if (!utils) {
+        console.error('[renderer] appUtils not found. Preload script may have failed.');
+        return;
+    }
+
+    // --- DOM References with null guards ---
     const html = document.documentElement;
-
-    // --- Task Logic ---
     const taskInput = document.getElementById('task-input');
     const taskList = document.querySelector('.task-list');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const closeSettingsBtn = document.getElementById('close-modal-btn');
+    const confirmSettingsBtn = document.getElementById('confirm-settings-btn');
+    const themeOptions = document.querySelectorAll('.theme-btn');
+    const pinBtn = document.getElementById('pin-btn');
+    const dragRegion = document.querySelector('.drag-region');
 
-    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+    // Defensive check: abort if critical DOM elements are missing
+    const criticalElements = { taskInput, taskList, settingsBtn, settingsModal, pinBtn, dragRegion };
+    for (const [name, el] of Object.entries(criticalElements)) {
+        if (!el) {
+            console.error(`[renderer] Critical DOM element missing: ${name}`);
+            return;
+        }
+    }
+
+    // --- Task Logic ---
+    let tasks = loadTasks();
     let isImportantMode = false;
 
     taskList.innerHTML = '';
@@ -17,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle Tab to toggle importance
     taskInput.addEventListener('keydown', (e) => {
         if (e.key === 'Tab') {
-            e.preventDefault(); // Prevent focus loss
+            e.preventDefault();
             isImportantMode = !isImportantMode;
             taskInput.classList.toggle('important-mode', isImportantMode);
         }
@@ -25,19 +52,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     taskInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-            const text = taskInput.value.trim();
-            if (text) {
-                const newTask = {
-                    id: Date.now(),
-                    text: text,
-                    completed: false,
-                    important: isImportantMode
-                };
+            const newTask = utils.createTask(taskInput.value, isImportantMode);
+            if (newTask) {
                 tasks.push(newTask);
                 saveTasks();
                 renderTask(newTask);
 
-                // Reset input and importance state
                 taskInput.value = '';
                 isImportantMode = false;
                 taskInput.classList.remove('important-mode');
@@ -47,7 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTask(task) {
         const li = document.createElement('li');
-        // Add 'important' class if task is marked as such
         const classes = ['task-item'];
         if (task.completed) classes.push('completed');
         if (task.important) classes.push('important');
@@ -64,7 +83,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     </svg>
                 </div>
             </label>
-            <span class="task-text">${escapeHtml(task.text)}</span>
+            <span class="task-text">${utils.escapeHtml(task.text)}</span>
+            <button class="toggle-importance-btn" title="${task.important ? '转为常规' : '转为紧急'}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+                    <line x1="4" y1="22" x2="4" y2="15"/>
+                </svg>
+            </button>
             <button class="delete-btn" title="Delete task">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="3 6 5 6 21 6"></polyline>
@@ -74,123 +99,105 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         const checkbox = li.querySelector('input[type="checkbox"]');
-        checkbox.addEventListener('change', () => {
-            task.completed = checkbox.checked;
-            li.classList.toggle('completed', task.completed);
-            saveTasks();
-        });
+        if (checkbox) {
+            checkbox.addEventListener('change', () => {
+                task.completed = checkbox.checked;
+                li.classList.toggle('completed', task.completed);
+                saveTasks();
+            });
+        }
 
         const deleteBtn = li.querySelector('.delete-btn');
-        deleteBtn.addEventListener('click', () => {
-            // Uncheck (visually) immediately if checking out
-            li.style.pointerEvents = 'none'; // Prevent further clicks
-            li.classList.add('is-deleting');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                li.style.pointerEvents = 'none';
+                li.classList.add('is-deleting');
 
-            // Wait for animation to finish
-            setTimeout(() => {
-                li.remove();
-                tasks = tasks.filter(t => t.id !== task.id);
+                setTimeout(() => {
+                    li.remove();
+                    tasks = utils.removeTask(tasks, task.id);
+                    saveTasks();
+                }, 400); // Matches CSS animation duration
+            });
+        }
+
+        const toggleBtn = li.querySelector('.toggle-importance-btn');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                task.important = !task.important;
+                li.classList.toggle('important', task.important);
+                toggleBtn.title = task.important ? '转为常规' : '转为紧急';
                 saveTasks();
-            }, 400); // Matches CSS animation duration
-        });
+            });
+        }
 
         taskList.appendChild(li);
-        // Only scroll if it's a new task (not re-rendering all) - simple check
         if (!task.completed) {
             taskList.scrollTop = taskList.scrollHeight;
         }
     }
 
+    // --- Data Persistence Helpers ---
+    // Uses shared parseTasks from lib/utils.js for validated parsing.
+    function loadTasks() {
+        try {
+            const raw = localStorage.getItem('tasks');
+            const { tasks: parsed, error } = utils.parseTasks(raw);
+            if (error) {
+                console.warn('[renderer] Task parse issue:', error);
+            }
+            return parsed;
+        } catch (err) {
+            console.error('[renderer] Failed to load tasks from localStorage', err);
+            return [];
+        }
+    }
+
     function saveTasks() {
-        localStorage.setItem('tasks', JSON.stringify(tasks));
+        try {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        } catch (err) {
+            console.error('[renderer] Failed to save tasks to localStorage', err);
+        }
     }
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    // --- Settings & Theme Logic ---
-    // FIXED: Selectors match HTML now
-    const settingsBtn = document.getElementById('settings-btn');
-    const settingsModal = document.getElementById('settings-modal');
-    const closeSettingsBtn = document.getElementById('close-modal-btn'); // Fixed ID
-    const confirmSettingsBtn = document.getElementById('confirm-settings-btn'); // New Button
-    const themeOptions = document.querySelectorAll('.theme-btn'); // Fixed class
-    // html 已在文件顶部定义
-
-    // Position Lock Logic
-    const pinBtn = document.getElementById('pin-btn');
-    const dragRegion = document.querySelector('.drag-region');
+    // --- Position Lock Logic ---
     let isPositionLocked = false;
 
-    // 监听主进程的锁定状态变化
-    ipcRenderer.on('position-lock-changed', (event, locked) => {
+    // Listen for lock state changes from main process
+    api.on('position-lock-changed', (locked) => {
         isPositionLocked = locked;
         updateLockState(locked);
     });
 
-    // 获取初始锁定状态
-    ipcRenderer.send('get-position-lock-state');
+    // Request initial lock state
+    api.send('get-position-lock-state');
 
     pinBtn.addEventListener('click', () => {
         isPositionLocked = !isPositionLocked;
-        ipcRenderer.send('toggle-position-lock', isPositionLocked);
-        localStorage.setItem('isPositionLocked', isPositionLocked);
+        api.send('toggle-position-lock', isPositionLocked);
+        try {
+            localStorage.setItem('isPositionLocked', JSON.stringify(isPositionLocked));
+        } catch (err) {
+            console.error('[renderer] Failed to save lock state', err);
+        }
     });
 
     function updateLockState(locked) {
         if (locked) {
             pinBtn.classList.add('pinned');
-            pinBtn.title = "解锁窗口位置";
-            // 禁用拖动
+            pinBtn.title = '解锁窗口位置';
             dragRegion.style.webkitAppRegion = 'no-drag';
         } else {
             pinBtn.classList.remove('pinned');
-            pinBtn.title = "锁定窗口位置";
-            // 启用拖动
+            pinBtn.title = '锁定窗口位置';
             dragRegion.style.webkitAppRegion = 'drag';
         }
     }
 
-    // --- Glass Density (Opacity) Logic ---
-    const opacitySlider = document.getElementById('opacity-slider');
-    const opacityValueLabel = document.getElementById('opacity-value');
-    const glassControlSections = document.querySelectorAll('.glass-control');
-    const glassOpacityMin = 0.12;
-    const glassOpacityMax = 0.92;
-
-    // Load & Init Opacity
-    // Default higher (75) to provide good contrast against Acrylic's white noise
-    const savedOpacity = localStorage.getItem('bgOpacity');
-    setOpacity(savedOpacity !== null ? savedOpacity : '75');
-
-    opacitySlider.addEventListener('input', (e) => {
-        setOpacity(e.target.value);
-    });
-
-    function setOpacity(value, shouldPersist = true) {
-        const numericValue = Number(value);
-        const opacityFloat = glassOpacityMin + (numericValue / 100) * (glassOpacityMax - glassOpacityMin);
-
-        html.style.setProperty('--glass-opacity', opacityFloat.toFixed(2));
-
-        opacitySlider.value = String(numericValue);
-        opacityValueLabel.textContent = `${numericValue}%`;
-
-        if (shouldPersist) {
-            localStorage.setItem('bgOpacity', String(numericValue));
-        }
-    }
-
-
-
-    // Load saved theme
-
-    // Load saved theme
+    // --- Theme Logic ---
     let savedTheme = localStorage.getItem('theme') || 'glass';
-    if (savedTheme === 'system') savedTheme = 'glass';
+    if (savedTheme === 'system') savedTheme = 'glass'; // Legacy migration
     applyTheme(savedTheme);
 
     // Toggle Modal
@@ -198,59 +205,42 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsModal.classList.add('active');
     });
 
-    // Close Actions
     function closeModal() {
         settingsModal.classList.remove('active');
     }
 
-    closeSettingsBtn.addEventListener('click', closeModal);
-    confirmSettingsBtn.addEventListener('click', closeModal); // Added Confirm Action
+    if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeModal);
+    if (confirmSettingsBtn) confirmSettingsBtn.addEventListener('click', closeModal);
 
-    // Close when clicking outside
+    // Close when clicking outside modal content
     settingsModal.addEventListener('click', (e) => {
         if (e.target === settingsModal) {
             closeModal();
         }
     });
 
-    // Theme Switching
+    // Theme switching
     themeOptions.forEach(option => {
         option.addEventListener('click', () => {
             const theme = option.dataset.theme;
-            applyTheme(theme);
+            if (theme) {
+                applyTheme(theme);
+            }
         });
     });
 
     function applyTheme(theme) {
-        // Update UI state
         themeOptions.forEach(opt => {
             opt.classList.toggle('active', opt.dataset.theme === theme);
         });
 
-        let effectiveTheme = theme;
-        // System theme logic removed
+        html.setAttribute('data-theme', theme);
 
-
-        html.setAttribute('data-theme', effectiveTheme);
-
-        const isGlass = theme === 'glass';
-        if (isGlass) {
-            const savedOpacity = localStorage.getItem('bgOpacity') || '75';
-            setOpacity(savedOpacity, false);
+        try {
+            localStorage.setItem('theme', theme);
+        } catch (err) {
+            console.error('[renderer] Failed to save theme', err);
         }
-
-        setGlassControlsEnabled(isGlass);
-
-        // Save preference immediately
-        localStorage.setItem('theme', theme);
     }
-
-    function setGlassControlsEnabled(enabled) {
-        opacitySlider.disabled = !enabled;
-        glassControlSections.forEach(section => {
-            section.classList.toggle('is-disabled', !enabled);
-        });
-    }
-
 
 });

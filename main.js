@@ -1,177 +1,226 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { isBoolean } = require('./lib/utils');
 
-let mainWindow;
+// --- Application State ---
+let mainWindow = null;
 let tray = null;
+let isQuitting = false; // Proper flag instead of patching app object
 let isPositionLocked = false;
 
-function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 350,
-        height: 600,
-        frame: false,
-        transparent: false, // 使用 backgroundMaterial 时需要关闭 transparent
-        resizable: false,
-        alwaysOnTop: false,
-        skipTaskbar: true, // 默认不显示在任务栏，由托盘控制
-        icon: getAppIcon(), // 设置窗口图标
-        backgroundColor: '#00000000',
-        backgroundMaterial: 'acrylic', // Windows 11 原生模糊效果
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
-        }
-    });
-
-    mainWindow.loadFile('index.html');
-
-    // 窗口加载完成后发送初始位置
-    mainWindow.webContents.on('did-finish-load', () => {
-        sendWindowContext();
-    });
-
-    // 窗口移动时通知渲染进程更新背景位置
-    mainWindow.on('move', () => {
-        sendWindowContext();
-    });
-
-    // 窗口显示时刷新背景
-    mainWindow.on('show', () => {
-        sendWindowContext();
-    });
-
-    // 拦截关闭事件：点击关闭按钮时隐藏窗口而不是退出
-    mainWindow.on('close', (event) => {
-        if (!app.isQuiting) {
-            event.preventDefault();
-            mainWindow.hide();
-        }
-        return false;
-    });
-
-    mainWindow.on('closed', () => {
-        mainWindow = null;
-    });
+// --- Logging Utility (Systematic Debugging) ---
+// Simple structured logger for main process diagnostics.
+// Prefixes messages with timestamp and component for easy filtering.
+function log(component, message, data = null) {
+    const timestamp = new Date().toISOString();
+    const prefix = `[${timestamp}] [${component}]`;
+    if (data !== null) {
+        console.log(`${prefix} ${message}`, data);
+    } else {
+        console.log(`${prefix} ${message}`);
+    }
 }
 
-// 获取应用图标（用于窗口）
-function getAppIcon() {
-    const iconPathPng = path.join(__dirname, 'icon.png');
-    const iconPathIco = path.join(__dirname, 'icon.ico');
-    // SVG 支持可能有限，优先使用 PNG/ICO
-    if (fs.existsSync(iconPathPng)) return nativeImage.createFromPath(iconPathPng);
-    if (fs.existsSync(iconPathIco)) return nativeImage.createFromPath(iconPathIco);
-    return null;
+function logError(component, message, error) {
+    const timestamp = new Date().toISOString();
+    console.error(`[${timestamp}] [${component}] ${message}`, error?.message || error);
+    if (error?.stack) {
+        console.error(`[${timestamp}] [${component}] Stack:`, error.stack);
+    }
 }
 
-function getTrayIcon() {
-    // 托盘图标查找顺序：PNG -> ICO -> SVG -> 默认生成
-    const iconPathPng = path.join(__dirname, 'icon.png');
-    if (fs.existsSync(iconPathPng)) return nativeImage.createFromPath(iconPathPng);
-    
-    const iconPathIco = path.join(__dirname, 'icon.ico');
-    if (fs.existsSync(iconPathIco)) return nativeImage.createFromPath(iconPathIco);
+// --- Icon Helpers ---
+// Consolidated icon lookup with error handling.
+// Falls back gracefully if no icon file is found.
+function loadIcon(targetSize = null) {
+    const iconPaths = [
+        { ext: 'png', path: path.join(__dirname, 'icon.png') },
+        { ext: 'ico', path: path.join(__dirname, 'icon.ico') },
+        { ext: 'svg', path: path.join(__dirname, 'icon.svg') }
+    ];
 
-    // 尝试加载 SVG (Electron 对 Tray SVG 的支持视平台而定，通常需要 Resize)
-    const iconPathSvg = path.join(__dirname, 'icon.svg');
-    if (fs.existsSync(iconPathSvg)) {
-        const image = nativeImage.createFromPath(iconPathSvg);
-        // 调整为适合托盘的大小 (通常 16x16 或 32x32)
-        return image.resize({ width: 16, height: 16 });
+    for (const icon of iconPaths) {
+        try {
+            if (fs.existsSync(icon.path)) {
+                const image = nativeImage.createFromPath(icon.path);
+                if (image.isEmpty()) {
+                    log('icon', `Icon file exists but loaded empty: ${icon.path}`);
+                    continue;
+                }
+                // Resize for tray if targetSize specified (SVG especially needs this)
+                if (targetSize && icon.ext === 'svg') {
+                    return image.resize({ width: targetSize, height: targetSize });
+                }
+                return image;
+            }
+        } catch (err) {
+            logError('icon', `Failed to load icon: ${icon.path}`, err);
+        }
     }
 
-    // 如果图标文件不存在，创建一个简单的图标
-    const icon = nativeImage.createEmpty();
-    // 创建一个16x16的蓝色图标
+    log('icon', 'No icon file found, generating fallback');
+    return createFallbackIcon();
+}
+
+function createFallbackIcon() {
     const size = 16;
     const buffer = Buffer.alloc(size * size * 4);
     for (let i = 0; i < size * size; i++) {
-        buffer[i * 4] = 96;     // R
-        buffer[i * 4 + 1] = 205; // G  
-        buffer[i * 4 + 2] = 255; // B (Windows 11 Blue)
-        buffer[i * 4 + 3] = 255; // A
+        buffer[i * 4] = 96;       // R
+        buffer[i * 4 + 1] = 205;  // G
+        buffer[i * 4 + 2] = 255;  // B (Windows 11 Blue)
+        buffer[i * 4 + 3] = 255;  // A
     }
     return nativeImage.createFromBuffer(buffer, { width: size, height: size });
 }
 
-function createTray() {
-    const trayIcon = getTrayIcon();
-    tray = new Tray(trayIcon);
-
-    const contextMenu = Menu.buildFromTemplate([
-        {
-            label: '显示/隐藏',
-            click: () => {
-                if (mainWindow) {
-                    if (mainWindow.isVisible()) {
-                        mainWindow.hide();
-                    } else {
-                        mainWindow.show();
-                        mainWindow.focus();
-                    }
-                }
+// --- Window Management ---
+function createWindow() {
+    try {
+        mainWindow = new BrowserWindow({
+            width: 350,
+            height: 600,
+            frame: false,
+            transparent: true, // Pure transparent window — no DWM Acrylic
+            resizable: false,
+            alwaysOnTop: false,
+            skipTaskbar: true,
+            icon: loadIcon(),
+            backgroundColor: '#00000000',
+            webPreferences: {
+                // Security: Use preload script with contextBridge
+                // instead of nodeIntegration + contextIsolation: false
+                preload: path.join(__dirname, 'preload.js'),
+                nodeIntegration: false,
+                contextIsolation: true,
+                sandbox: false // Required for preload to use require()
             }
-        },
-        { type: 'separator' },
-        {
-            label: '退出',
-            click: () => {
-                app.isQuiting = true;
-                app.quit();
-            }
-        }
-    ]);
+        });
 
-    tray.setToolTip('YouShouldDO');
-    tray.setContextMenu(contextMenu);
+        mainWindow.loadFile('index.html');
 
-    // 单击托盘图标显示/隐藏窗口
-    tray.on('click', () => {
-        if (mainWindow) {
-            if (mainWindow.isVisible()) {
+        // Window lifecycle events
+        mainWindow.webContents.on('did-finish-load', () => {
+            log('window', 'Content loaded, sending initial context');
+            sendWindowContext();
+        });
+
+        mainWindow.on('move', () => {
+            sendWindowContext();
+        });
+
+        mainWindow.on('show', () => {
+            sendWindowContext();
+        });
+
+        // Hide on close instead of quitting (tray app pattern)
+        mainWindow.on('close', (event) => {
+            if (!isQuitting) {
+                event.preventDefault();
                 mainWindow.hide();
-            } else {
-                mainWindow.show();
-                mainWindow.focus();
             }
-        }
-    });
+        });
+
+        mainWindow.on('closed', () => {
+            mainWindow = null;
+            log('window', 'Window destroyed');
+        });
+
+        log('window', 'Window created successfully');
+    } catch (err) {
+        logError('window', 'Failed to create window', err);
+    }
 }
 
-// 处理固定位置切换
+// --- Toggle Window Visibility (DRY helper) ---
+function toggleWindowVisibility() {
+    if (!mainWindow) return;
+    if (mainWindow.isVisible()) {
+        mainWindow.hide();
+    } else {
+        mainWindow.show();
+        mainWindow.focus();
+    }
+}
+
+// --- Tray Management ---
+function createTray() {
+    try {
+        const trayIcon = loadIcon(16);
+        tray = new Tray(trayIcon);
+
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: '显示/隐藏',
+                click: toggleWindowVisibility
+            },
+            { type: 'separator' },
+            {
+                label: '退出',
+                click: () => {
+                    isQuitting = true;
+                    app.quit();
+                }
+            }
+        ]);
+
+        tray.setToolTip('YouShouldDO');
+        tray.setContextMenu(contextMenu);
+        tray.on('click', toggleWindowVisibility);
+
+        log('tray', 'Tray created successfully');
+    } catch (err) {
+        logError('tray', 'Failed to create tray', err);
+    }
+}
+
+// --- IPC Handlers (with input validation) ---
+
+// Toggle position lock
+// Validates that shouldLock is a boolean before applying.
 ipcMain.on('toggle-position-lock', (event, shouldLock) => {
+    if (!isBoolean(shouldLock)) {
+        log('ipc', 'Invalid toggle-position-lock payload, expected boolean', { shouldLock });
+        return;
+    }
     if (!mainWindow) return;
     isPositionLocked = shouldLock;
-    // 通知渲染进程更新状态
     event.reply('position-lock-changed', isPositionLocked);
+    log('ipc', `Position lock: ${isPositionLocked}`);
 });
 
-// 获取当前锁定状态
+// Get current lock state
 ipcMain.on('get-position-lock-state', (event) => {
     event.reply('position-lock-changed', isPositionLocked);
 });
 
-// 发送窗口位置和显示器信息给渲染进程
+// Send window position and display info to the renderer
 function sendWindowContext() {
-    if (!mainWindow) return;
-    const bounds = mainWindow.getBounds();
-    const display = screen.getDisplayMatching(bounds);
-    mainWindow.webContents.send('window-context', {
-        windowBounds: bounds,
-        displayBounds: display.bounds,
-        displaySize: display.size,
-        scaleFactor: display.scaleFactor,
-        displayId: display.id
-    });
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    try {
+        const bounds = mainWindow.getBounds();
+        const display = screen.getDisplayMatching(bounds);
+        mainWindow.webContents.send('window-context', {
+            windowBounds: bounds,
+            displayBounds: display.bounds,
+            displaySize: display.size,
+            scaleFactor: display.scaleFactor,
+            displayId: display.id
+        });
+    } catch (err) {
+        logError('ipc', 'Failed to send window context', err);
+    }
 }
 
-// 响应渲染进程请求窗口上下文
+// Respond to renderer requesting window context
 ipcMain.on('request-window-context', () => {
     sendWindowContext();
 });
 
+// --- App Lifecycle ---
 app.whenReady().then(() => {
+    log('app', 'App ready, creating window and tray');
     createWindow();
     createTray();
 
@@ -180,10 +229,25 @@ app.whenReady().then(() => {
             createWindow();
         }
     });
+}).catch((err) => {
+    logError('app', 'Failed during app initialization', err);
 });
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
+    }
+});
+
+// Cleanup tray on quit to prevent ghost icons
+app.on('before-quit', () => {
+    isQuitting = true;
+    log('app', 'App quitting');
+});
+
+app.on('will-quit', () => {
+    if (tray) {
+        tray.destroy();
+        tray = null;
     }
 });
