@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(js|json|yml|yaml|rc\\)$\")",
+      "Bash(npx skills:*)",
+      "Bash(npm test:*)",
+      "Bash(du -sh dist/win-unpacked/*/)",
+      "Bash(npx asar:*)",
+      "Bash(while read:*)",
+      "Bash(do echo:*)",
+      "Bash(done)",
+      "Bash(npm run:*)",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(curl -sSf https://win.rustup.rs/x86_64 -o /tmp/rustup-init.exe)",
+      "Bash(/tmp/rustup-init.exe -y --default-toolchain stable)",
+      "Bash(export PATH=\"$HOME/.cargo/bin:$PATH\")",
+      "Bash(npm install:*)",
+      "Bash(npx tauri:*)",
+      "Bash(cargo build:*)",
+      "Bash(winget --version)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin//**)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC//**)",
+      "Bash(ls \"/c/Program Files \\(x86\\)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/bin/Hostx86/\")",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio/2022/BuildTools/VC/**)"
+    ]
+  }
+}

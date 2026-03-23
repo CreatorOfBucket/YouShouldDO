@@ -8,7 +8,7 @@ const {
     removeTask,
     parseTasks,
     isBoolean
-} = require('../lib/utils');
+} = require('../src/lib/utils');
 
 // ============================================================
 // escapeHtml
