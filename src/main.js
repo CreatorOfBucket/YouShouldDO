@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const { invoke } = window.__TAURI__.core;
+    const { getCurrentWindow } = window.__TAURI__.window;
     const utils = window.appUtils;
 
     if (!utils) {
@@ -175,15 +176,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Drag the window by mousedown on the drag region (excluding buttons)
+    dragRegion.addEventListener('mousedown', (e) => {
+        if (e.buttons === 1 && !isPositionLocked && !e.target.closest('button')) {
+            getCurrentWindow().startDragging();
+        }
+    });
+
     function updateLockState(locked) {
         if (locked) {
             pinBtn.classList.add('pinned');
             pinBtn.title = '解锁窗口位置';
-            dragRegion.removeAttribute('data-tauri-drag-region');
         } else {
             pinBtn.classList.remove('pinned');
             pinBtn.title = '锁定窗口位置';
-            dragRegion.setAttribute('data-tauri-drag-region', '');
         }
     }
 

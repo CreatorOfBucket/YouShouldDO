@@ -1,6 +1,6 @@
 {
     "productName": "YouShouldDO",
-    "version": "1.0.5",
+    "version": "2.0.1",
     "identifier": "com.youshoulddo.app",
     "build": {
         "frontendDist": "../src"
@@ -36,7 +36,7 @@
         ],
         "windows": {
             "nsis": {
-                "installMode": "notSilent"
+                "installMode": "currentUser"
             }
         }
     }
